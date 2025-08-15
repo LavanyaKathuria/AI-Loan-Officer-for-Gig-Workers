@@ -91,29 +91,28 @@ The Gradio interface includes:
 ---
 
 
-⚙️ Installation
-bash
-Copy
-Edit
-# 1️⃣ Clone this repository
+## ⚙️ Installation
+
+ 1️⃣ Clone this repository
 git clone https://github.com/LavanyaKathuria/AI-Loan-Officer-for-Gig-Workers
 cd AI-Loan-Officer-for-Gig-Workers
 
-# 2️⃣ Create virtual environment
+ 2️⃣ Create virtual environment
 python -m venv venv
 source venv/bin/activate  # Mac/Linux
 venv\Scripts\activate     # Windows
 
-# 3️⃣ Install dependencies
+ 3️⃣ Install dependencies
 pip install -r requirements.txt
-🚀 Usage
+
+## 🚀 Usage
 bash
 Copy
 Edit
 python app.py
 This will launch the Gradio interface in your browser.
 
-🔗 Links
+## 🔗 Links
 GitHub Repository: 📂 [Click Here](https://github.com/LavanyaKathuria/AI-Loan-Officer-for-Gig-Workers)
 
 Hugging Face Model: 🤗 [Click Here](https://huggingface.co/spaces/Lavanyakathuria/AI-Loan-Officer-Gig-Workers)
