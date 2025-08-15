@@ -14,7 +14,9 @@ An AI-powered web application that evaluates loan applications for gig workers b
 - [Dataset](#dataset)
 - [Model Logic](#model-logic)
 - [UI](#ui)
-
+- [Installation](#installation)
+- [Usage](#usage)
+- [Links](#links)
 
 ## 📖 About
 Gig workers often face challenges when applying for loans due to irregular income and lack of formal credit history.  
@@ -85,5 +87,29 @@ The Gradio interface includes:
 ---
 
 
-# Install dependencies
+⚙️ Installation
+bash
+Copy
+Edit
+# 1️⃣ Clone this repository
+git clone https://github.com/LavanyaKathuria/AI-Loan-Officer-for-Gig-Workers
+cd AI-Loan-Officer-for-Gig-Workers
+
+# 2️⃣ Create virtual environment
+python -m venv venv
+source venv/bin/activate  # Mac/Linux
+venv\Scripts\activate     # Windows
+
+# 3️⃣ Install dependencies
 pip install -r requirements.txt
+🚀 Usage
+bash
+Copy
+Edit
+python app.py
+This will launch the Gradio interface in your browser.
+
+🔗 Links
+GitHub Repository: 📂 [Click Here](https://github.com/LavanyaKathuria/AI-Loan-Officer-for-Gig-Workers)
+
+Hugging Face Model: 🤗 [Click Here](https://huggingface.co/spaces/Lavanyakathuria/AI-Loan-Officer-Gig-Workers)
