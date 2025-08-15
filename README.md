@@ -43,6 +43,8 @@ Our **AI Loan Officer** uses a custom-trained machine learning model to **predic
 ---
 
 ## 📊 Dataset
+Link- https://drive.google.com/file/d/1mt815gQO2WEm9XNcJGXfDmHQtNiXQRg8/view?usp=sharing
+
 A synthetic-yet-realistic dataset of **20,000+ gig workers** generated with a lot of research and carefully designed interdependencies to reflect real-world conditions.  
 Top 15 most important features (in order of weight):
 
