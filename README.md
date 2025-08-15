@@ -2,7 +2,7 @@
 
 An AI-powered web application that evaluates loan applications for gig workers based on their earning patterns, work stability, platform tenure, and financial behavior — just like a real loan officer would, but faster, more consistent, and without bias.
 
-Hugging Face Space: [https://huggingface.co/spaces/YourSpaceName](https://huggingface.co/spaces/Lavanyakathuria/AI-Loan-Officer-Gig-Workers)
+Hugging Face Space: [https://huggingface.co/spaces/Lavanyakathuria/AI-Loan-Officer-Gig-Workers](https://huggingface.co/spaces/Lavanyakathuria/AI-Loan-Officer-Gig-Workers)
 ---
 
 ## 📌 Table of Contents
