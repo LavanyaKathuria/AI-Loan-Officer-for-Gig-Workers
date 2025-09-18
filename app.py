@@ -31,7 +31,6 @@ except Exception as e:
 def engineer_features(df):
     """
     Creates powerful, context-rich features.
-    Total Tenure is now the SUM and savings_log_capped is re-added.
     """
     df_eng = df.copy()
     
@@ -40,14 +39,12 @@ def engineer_features(df):
         if col in df_eng.columns:
             df_eng[col] = pd.to_numeric(df_eng[col], errors='coerce').fillna(0)
 
-    # --- RE-ADDED: Cap and Log Transform Savings ---
     capped_savings = df_eng['savings'].clip(upper=200000)
     df_eng['savings_log_capped'] = np.log1p(capped_savings)
     
     df_eng['avg_monthly_earnings'] = df_eng['avg_monthly_earnings'].clip(lower=1)
     df_eng['loan_to_income_ratio'] = df_eng['loan_amount_requested'] / df_eng['avg_monthly_earnings']
     
-    # --- REVERTED: Total tenure is now the SUM of the two platforms ---
     df_eng['total_tenure_months'] = df_eng['tenure_platform_1_months'] + df_eng['tenure_platform_2_months']
     
     df_eng['disposable_income'] = df_eng['avg_monthly_earnings'] - df_eng['recurring_expenses']
@@ -60,28 +57,87 @@ def engineer_features(df):
     
     return df_eng
 
-# ... (The rest of the app.py script remains the same as the last version)
-# calculate_emi, get_narrative_reasoning, apply_business_rules, make_loan_decision, and the Gradio UI
-# do not need to change, as they adapt to the features provided by engineer_features.
-
 def calculate_emi(principal, annual_rate, term_months):
     if principal <= 0 or annual_rate <= 0 or term_months <= 0: return 0
     monthly_rate = (annual_rate / 100) / 12
     emi = principal * monthly_rate * (1 + monthly_rate)**term_months / ((1 + monthly_rate)**term_months - 1)
     return emi
 
-def get_narrative_reasoning(shap_values, feature_names, decision, top_n=3):
-    sv = pd.Series(shap_values, index=feature_names)
-    friendly_names = {name: name.replace('_', ' ').replace('num__', '').replace('cat__', '') for name in feature_names}
-    sv.index = sv.index.map(friendly_names)
-    pos_contributors = sv[sv > 0].nlargest(top_n)
-    neg_contributors = sv[sv < 0].nsmallest(top_n)
-    strengths = ", ".join(pos_contributors.index) if not pos_contributors.empty else "None identified"
-    concerns = ", ".join(neg_contributors.index) if not neg_contributors.empty else "None identified"
-    summary = "This was a borderline case with competing positive and negative factors."
-    if sv.sum() > 0.5: summary = "Overall, the applicant's positive factors significantly outweigh the risks."
-    elif sv.sum() < -0.5: summary = "Overall, the model identified several risk factors that led to the rejection."
-    return f"- **Decision Driver:** AI Model Analysis\n- **Key Strengths:** {strengths}\n- **Major Concerns:** {concerns}\n- **Summary:** {summary}"
+def get_narrative_reasoning(shap_values, feature_names, decision, applicant_data, top_n=3):
+    """Generates a conversational, human-like loan officer's assessment."""
+    applicant_name = applicant_data.get('name', 'Applicant').split(" ")[0]
+    sv_series = pd.Series(shap_values, index=feature_names)
+
+    # --- Feature to Friendly Name and Narrative Mapping ---
+    narrative_map = {
+        'gig_performance_score': {
+            'positive': "Your strong Gig Performance Score, which considers your platform rating, tenure, and earnings, was a key factor. It indicates you are a consistent and reliable professional in the gig economy.",
+            'negative': "The Gig Performance Score was a point of concern. This score looks at platform rating, tenure, and earnings, and a lower value suggests some risk or inconsistency in your work profile."
+        },
+        'disposable_income': {
+            'positive': f"We were impressed with your healthy disposable income of ₹{int(applicant_data.get('disposable_income', 0)):,}. This demonstrates a strong capacity to comfortably manage monthly loan payments.",
+            'negative': f"After reviewing your income and expenses, your disposable income of ₹{int(applicant_data.get('disposable_income', 0)):,} was a concern. This narrow margin could make it difficult to take on new debt."
+        },
+        'loan_to_income_ratio': {
+            'positive': "The loan amount requested is very reasonable compared to your earnings, resulting in a good Loan-to-Income ratio. This was a significant positive point in your favor.",
+            'negative': "The primary concern was the high Loan-to-Income ratio. The requested loan amount is quite large relative to your income, which raises questions about long-term affordability."
+        },
+        'savings_log_capped': {
+            'positive': "Your savings history is commendable and shows excellent financial discipline. This financial cushion significantly reduces risk and was viewed very positively.",
+            'negative': "The level of savings was lower than anticipated, which can indicate limited capacity to handle unexpected financial shocks during the loan term."
+        },
+        'credit_score': {
+            'positive': f"Your credit score of {int(applicant_data.get('credit_score', 0))} is solid. It reflects a responsible credit history and played an important role in this decision.",
+            'negative': f"The credit score of {int(applicant_data.get('credit_score', 0))} was a contributing factor. A lower score can suggest past difficulties with credit obligations."
+        },
+        'total_tenure_months': {
+            'positive': f"With a total of {int(applicant_data.get('total_tenure_months', 0))} months of experience on gig platforms, you have demonstrated stability and a long-term presence in your field. This consistency is a major strength.",
+            'negative': f"Your relatively short time on the gig platforms ({int(applicant_data.get('total_tenure_months', 0))} months) means we have less data to establish a long-term trend of stability."
+        },
+        'num_loan_rejections_6mo': {
+            'positive': "We noted that you have not had recent loan rejections, which is a positive signal.",
+            'negative': f"The {int(applicant_data.get('num_loan_rejections_6mo', 0))} loan rejections in the past six months were a significant red flag, suggesting other lenders may have also identified risks in your profile."
+        }
+    }
+
+    pos_contributors_tech = sv_series[sv_series > 0].nlargest(top_n)
+    neg_contributors_tech = sv_series[sv_series < 0].nsmallest(top_n)
+
+    def get_narrative_for_feature(tech_name):
+        clean_name = tech_name.replace('num__', '').replace('cat__', '')
+        for key in narrative_map:
+            if clean_name.startswith(key):
+                return narrative_map[key]
+        return None
+
+    positive_narratives = [p['positive'] for feature, _ in pos_contributors_tech.items() if (p := get_narrative_for_feature(feature))]
+    negative_narratives = [n['negative'] for feature, _ in neg_contributors_tech.items() if (n := get_narrative_for_feature(feature))]
+
+    if decision == "Approve":
+        report = f"### Loan Assessment for {applicant_name}\n\n"
+        report += f"**Dear {applicant_name},**\n\n"
+        report += "We are pleased to inform you that your loan application has been **approved**. Our decision was based on a comprehensive review of your profile, with several key strengths noted by our AI model.\n\n"
+        if positive_narratives:
+            report += "#### Key Positive Factors:\n"
+            for p in positive_narratives: report += f"- {p}\n"
+        if negative_narratives:
+            report += "\n#### Areas Considered:\n"
+            report += "We did consider some minor risk factors, but your overall strong profile outweighed them. For instance:\n"
+            for n in negative_narratives: report += f"- {n.replace('was a concern', 'was noted').replace('was a point of concern', 'was reviewed')}\n"
+        report += "\nCongratulations! We believe in supporting the ambitions of gig economy professionals like you."
+    else:
+        report = f"### Loan Assessment for {applicant_name}\n\n"
+        report += f"**Dear {applicant_name},**\n\n"
+        report += "Thank you for your interest. After a careful review of your application, we regret to inform you that we are unable to approve your loan request at this time. Our AI model identified a few key areas of concern that led to this decision.\n\n"
+        if negative_narratives:
+            report += "#### Primary Reasons for Decision:\n"
+            for n in negative_narratives: report += f"- {n}\n"
+        if positive_narratives:
+            report += "\n#### Profile Strengths Acknowledged:\n"
+            report += "We want to acknowledge the strong points in your profile, which we did take into consideration:\n"
+            for p in positive_narratives: report += f"- {p}\n"
+        report += "\nWe encourage you to focus on strengthening the areas mentioned above. We wish you the best and invite you to reapply in the future should your circumstances change."
+    return report
 
 def apply_business_rules(applicant_data):
     if applicant_data.get('age', 25) < 21: return {"decision": "Reject", "reason": "Rule: Applicant must be at least 21."}
@@ -96,7 +152,6 @@ def make_loan_decision(name, age, gender, city, education, dependent_count, loca
                        tenure_platform_2_months, working_hours_per_day,
                        loan_amount_requested, loan_term_months, purpose_of_loan, num_loan_rejections_6mo):
     
-    # --- FIX: Simplified return values for error cases ---
     if not pipeline or not interest_pipeline:
         return "Error", "Models not loaded. Check server logs.", "", "N/A", None
 
@@ -109,7 +164,6 @@ def make_loan_decision(name, age, gender, city, education, dependent_count, loca
     if any(field is None or str(field) == '' for field in required_fields):
         return "Error", "Please fill in all required fields.", "", "N/A", None
     
-    # --- The rest of the function logic remains the same ---
     applicant_dict = {
         'name': name, 'age': age, 'gender': gender, 'education': education, 'dependent_count': dependent_count,
         'location_stability': location_stability, 'avg_monthly_earnings': avg_monthly_earnings,
@@ -137,7 +191,10 @@ def make_loan_decision(name, age, gender, city, education, dependent_count, loca
         decision_by_ai = "Approve" if probability >= 0.5 else "Reject"
         applicant_transformed = pipeline.named_steps['preprocessor'].transform(applicant_df_eng)
         shap_vals = explainer.shap_values(applicant_transformed)[0]
-        reason = get_narrative_reasoning(shap_vals, TRANSFORMED_FEATURE_NAMES, decision_by_ai)
+        
+        # --- MODIFIED CALL ---
+        reason = get_narrative_reasoning(shap_vals, TRANSFORMED_FEATURE_NAMES, decision_by_ai, applicant_df_eng.iloc[0].to_dict())
+
         if decision_by_ai == "Approve":
             final_decision = "Approve"
             predicted_rate = interest_pipeline.predict(applicant_df_eng)[0]
@@ -155,6 +212,12 @@ def make_loan_decision(name, age, gender, city, education, dependent_count, loca
             final_decision = "Reject"
 
     if final_decision == "Approve":
+        # Recalculate these to ensure they exist in this scope
+        predicted_rate = interest_pipeline.predict(applicant_df_eng)[0]
+        interest_rate = round(np.clip(predicted_rate, 12.0, 30.0), 2)
+        sanction_factor = np.interp(probability, [0.5, 1.0], [0.6, 1.0])
+        sanctioned_amount = min(round(loan_amount_requested * sanction_factor, -3), loan_amount_requested)
+        loan_term = int(loan_term_months)
         emi = calculate_emi(sanctioned_amount, interest_rate, loan_term)
         details_md = f"**Final Sanctioned Amount:** ₹{int(sanctioned_amount):,}\n**Data-Driven Interest Rate:** {interest_rate:.2f}% p.a.\n**Loan Term:** {loan_term} months"
         emi_text = f"₹{emi:,.2f} per month"
@@ -169,7 +232,6 @@ def make_loan_decision(name, age, gender, city, education, dependent_count, loca
     plt.tight_layout()
     fig = plt.gcf()
         
-    # --- FIX: Return the simple text decision for the label ---
     return final_decision, reason, details_md, emi_text, fig
 
 # --- 3. CREATE THE FINAL GRADIO INTERFACE ---
@@ -250,7 +312,6 @@ with gr.Blocks(theme=theme, title="AI Loan Officer") as demo:
         shap_plot_output = gr.Plot(label="Key Factors Influencing the Decision (SHAP Analysis)")
         
     def submit_and_open_accordion(*args):
-        # A simple check for NoneType before calling the main function
         label, reason, details, emi, plot = make_loan_decision(*args)
         return label, reason, details, emi, plot, gr.Accordion(open=True)
 
@@ -263,7 +324,6 @@ with gr.Blocks(theme=theme, title="AI Loan Officer") as demo:
         loan_amount_requested, loan_term_months, purpose_of_loan, num_loan_rejections_6mo
     ]
     
-    # This list defines which inputs must be filled for the button to activate
     required_inputs = [
         name, age, gender, city, education, dependent_count, location_stability,
         avg_monthly_earnings, recurring_expenses, savings, assets_inr, credit_card_user,
