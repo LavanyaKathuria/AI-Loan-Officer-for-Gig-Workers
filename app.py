@@ -68,7 +68,6 @@ def get_narrative_reasoning(shap_values, feature_names, decision, applicant_data
     applicant_name = applicant_data.get('name', 'Applicant').split(" ")[0]
     sv_series = pd.Series(shap_values, index=feature_names)
 
-    # --- Feature to Friendly Name and Narrative Mapping ---
     narrative_map = {
         'gig_performance_score': {
             'positive': "Your strong Gig Performance Score, which considers your platform rating, tenure, and earnings, was a key factor. It indicates you are a consistent and reliable professional in the gig economy.",
@@ -139,6 +138,7 @@ def get_narrative_reasoning(shap_values, feature_names, decision, applicant_data
         report += "\nWe encourage you to focus on strengthening the areas mentioned above. We wish you the best and invite you to reapply in the future should your circumstances change."
     return report
 
+
 def apply_business_rules(applicant_data):
     if applicant_data.get('age', 25) < 21: return {"decision": "Reject", "reason": "Rule: Applicant must be at least 21."}
     if applicant_data.get('avg_monthly_earnings', 0) < 12000: return {"decision": "Reject", "reason": "Rule: Minimum monthly income not met."}
@@ -192,7 +192,6 @@ def make_loan_decision(name, age, gender, city, education, dependent_count, loca
         applicant_transformed = pipeline.named_steps['preprocessor'].transform(applicant_df_eng)
         shap_vals = explainer.shap_values(applicant_transformed)[0]
         
-        # --- MODIFIED CALL ---
         reason = get_narrative_reasoning(shap_vals, TRANSFORMED_FEATURE_NAMES, decision_by_ai, applicant_df_eng.iloc[0].to_dict())
 
         if decision_by_ai == "Approve":
@@ -207,12 +206,11 @@ def make_loan_decision(name, age, gender, city, education, dependent_count, loca
             max_affordable_emi = disposable_income * 0.60
             if emi > max_affordable_emi:
                 final_decision = "Reject"
-                reason = f"**Affordability Check Failed:** Est. EMI ₹{int(emi):,} > Max Affordable ₹{int(max_affordable_emi):,}."
+                reason = f"**Affordability Check Failed:** Estimated EMI of ₹{int(emi):,} exceeds the maximum affordable amount of ₹{int(max_affordable_emi):,} based on your disposable income."
         else:
             final_decision = "Reject"
 
     if final_decision == "Approve":
-        # Recalculate these to ensure they exist in this scope
         predicted_rate = interest_pipeline.predict(applicant_df_eng)[0]
         interest_rate = round(np.clip(predicted_rate, 12.0, 30.0), 2)
         sanction_factor = np.interp(probability, [0.5, 1.0], [0.6, 1.0])
@@ -245,63 +243,63 @@ theme = gr.themes.Soft(
 
 with gr.Blocks(theme=theme, title="AI Loan Officer") as demo:
     gr.Markdown("<h1 style='text-align: center; margin-bottom: 20px;'>AI Loan Officer for the Gig Economy</h1>")
-    gr.Markdown("<h3 style='text-align: center; color: #666;'>Enter applicant details to receive a data-driven loan decision.</h3>")
+    gr.Markdown("<h3 style='text-align: center; color: #666;'>A sample case is pre-filled. Click 'Evaluate' or modify the details below.</h3>")
     
     with gr.Tabs():
         with gr.TabItem("👤 Personal & Work"):
             with gr.Group():
                 gr.Markdown("#### **Applicant's Basic Information**")
                 with gr.Row():
-                    name = gr.Textbox(label="Full Name", placeholder="e.g., Priya Singh")
-                    age = gr.Slider(minimum=18, maximum=70, value=None, step=1, label="Age")
+                    name = gr.Textbox(label="Full Name", value="Rohan Sharma") # Default value
+                    age = gr.Slider(minimum=18, maximum=70, value=32, step=1, label="Age") # Default value
                 with gr.Row():
-                    gender = gr.Radio(choices=["Female", "Male", "Other"], label="Gender", value=None)
-                    city = gr.Dropdown(label="City", choices=["Mumbai", "Delhi", "Bengaluru", "Chennai", "Kolkata", "Hyderabad", "Pune", "Ahmedabad", "Jaipur", "Lucknow", "Gurugram", "Noida", "Other"], allow_custom_value=True, value=None)
+                    gender = gr.Radio(choices=["Female", "Male", "Other"], label="Gender", value="Male") # Default value
+                    city = gr.Dropdown(label="City", choices=["Mumbai", "Delhi", "Bengaluru", "Chennai", "Kolkata", "Hyderabad", "Pune", "Ahmedabad", "Jaipur", "Lucknow", "Gurugram", "Noida", "Other"], allow_custom_value=True, value="Gurugram") # Default value
                 with gr.Row():
-                    education = gr.Dropdown(choices=["10th", "12th", "Graduate", "Post-graduate", "Other"], label="Highest Education", value=None)
-                    dependent_count = gr.Slider(minimum=0, maximum=10, value=None, step=1, label="Number of Dependents")
-                location_stability = gr.Dropdown(choices=["stable", "semi-stable", "unstable"], label="Location Stability", value=None)
+                    education = gr.Dropdown(choices=["10th", "12th", "Graduate", "Post-graduate", "Other"], label="Highest Education", value="12th") # Default value
+                    dependent_count = gr.Slider(minimum=0, maximum=10, value=2, step=1, label="Number of Dependents") # Default value
+                location_stability = gr.Dropdown(choices=["stable", "semi-stable", "unstable"], label="Location Stability", value="stable") # Default value
             
             with gr.Group():
                 gr.Markdown("#### **Gig Work Profile**")
                 with gr.Row():
-                    platform_primary = gr.Dropdown(choices=["Uber", "Ola", "Zomato", "Swiggy", "UrbanClap", "Other"], label="Primary Gig Platform", value=None)
-                    platform_secondary = gr.Textbox(label="Secondary Platform (if any)", placeholder="e.g., Dunzo")
+                    platform_primary = gr.Dropdown(choices=["Uber", "Ola", "Zomato", "Swiggy", "UrbanClap", "Other"], label="Primary Gig Platform", value="Uber") # Default value
+                    platform_secondary = gr.Textbox(label="Secondary Platform (if any)", placeholder="e.g., Dunzo", value="Zomato") # Default value
                 with gr.Row():
-                    sector = gr.Dropdown(choices=["cab", "food_delivery", "e-commerce", "domestic", "beauty", "other"], label="Primary Sector", value=None)
-                    rating = gr.Slider(minimum=1.0, maximum=5.0, step=0.1, value=None, label="Platform Rating (1-5)")
+                    sector = gr.Dropdown(choices=["cab", "food_delivery", "e-commerce", "domestic", "beauty", "other"], label="Primary Sector", value="cab") # Default value
+                    rating = gr.Slider(minimum=1.0, maximum=5.0, step=0.1, value=4.7, label="Platform Rating (1-5)") # Default value
                 with gr.Row():
-                    tenure_platform_1_months = gr.Slider(minimum=0, maximum=120, value=None, step=1, label="Months on Primary Platform")
-                    tenure_platform_2_months = gr.Slider(minimum=0, maximum=120, value=None, step=1, label="Months on Secondary Platform")
+                    tenure_platform_1_months = gr.Slider(minimum=0, maximum=120, value=30, step=1, label="Months on Primary Platform") # Default value
+                    tenure_platform_2_months = gr.Slider(minimum=0, maximum=120, value=12, step=1, label="Months on Secondary Platform") # Default value
 
         with gr.TabItem("💰 Financial Details"):
             with gr.Group():
                 gr.Markdown("#### **Income & Expenses**")
                 with gr.Row():
-                    avg_monthly_earnings = gr.Slider(minimum=10000, maximum=150000, value=None, step=1000, label="Average Monthly Earnings (₹)")
-                    recurring_expenses = gr.Slider(minimum=0, maximum=100000, value=None, step=1000, label="Recurring Monthly Expenses (₹)")
+                    avg_monthly_earnings = gr.Slider(minimum=10000, maximum=150000, value=45000, step=1000, label="Average Monthly Earnings (₹)") # Default value
+                    recurring_expenses = gr.Slider(minimum=0, maximum=100000, value=25000, step=1000, label="Recurring Monthly Expenses (₹)") # Default value
                 with gr.Row():
-                    savings = gr.Number(label="Total Savings (₹)", value=None)
-                    assets_inr = gr.Number(label="Total Assets Value (Vehicle, etc.) (₹)", value=None, info="Enter the approximate total value of significant assets.")
+                    savings = gr.Number(label="Total Savings (₹)", value=85000) # Default value
+                    assets_inr = gr.Number(label="Total Assets Value (Vehicle, etc.) (₹)", value=350000, info="Enter the approximate total value of significant assets.") # Default value
             with gr.Group():
                 gr.Markdown("#### **Credit Information**")
-                credit_card_user = gr.Radio(choices=["Yes", "No"], label="Is the applicant a credit card user?", value=None)
-                with gr.Row(visible=False) as credit_details_group:
-                    credit_score = gr.Slider(minimum=300, maximum=850, value=None, step=10, label="Credit Score (e.g., CIBIL)")
-                    credit_history_length_months = gr.Slider(minimum=0, maximum=120, value=None, step=1, label="Credit History (in Months)")
+                credit_card_user = gr.Radio(choices=["Yes", "No"], label="Is the applicant a credit card user?", value="Yes") # Default value
+                with gr.Row(visible=True) as credit_details_group: # Default visible=True
+                    credit_score = gr.Slider(minimum=300, maximum=850, value=740, step=10, label="Credit Score (e.g., CIBIL)") # Default value
+                    credit_history_length_months = gr.Slider(minimum=0, maximum=120, value=36, step=1, label="Credit History (in Months)") # Default value
                 def show_credit_details(is_user): return gr.update(visible=(is_user == "Yes"))
                 credit_card_user.change(fn=show_credit_details, inputs=credit_card_user, outputs=credit_details_group)
-            working_hours_per_day = gr.Slider(minimum=1, maximum=16, value=None, step=1, label="Average Daily Hours")
+            working_hours_per_day = gr.Slider(minimum=1, maximum=16, value=10, step=1, label="Average Daily Hours") # Default value
 
         with gr.TabItem("🏦 Loan Request"):
             with gr.Group():
-                loan_amount_requested = gr.Slider(minimum=10000, maximum=500000, value=None, step=5000, label="Loan Amount Requested (₹)")
-                loan_term_months = gr.Slider(minimum=6, maximum=60, value=None, step=6, label="Desired Loan Term (Months)")
-                purpose_of_loan = gr.Dropdown(choices=["vehicle", "business", "personal", "home_improvement", "debt_consolidation"], label="Purpose of Loan", value=None)
-                num_loan_rejections_6mo = gr.Slider(minimum=0, maximum=10, value=None, step=1, label="Loan Rejections in Last 6 Months")
+                loan_amount_requested = gr.Slider(minimum=10000, maximum=500000, value=150000, step=5000, label="Loan Amount Requested (₹)") # Default value
+                loan_term_months = gr.Slider(minimum=6, maximum=60, value=36, step=6, label="Desired Loan Term (Months)") # Default value
+                purpose_of_loan = gr.Dropdown(choices=["vehicle", "business", "personal", "home_improvement", "debt_consolidation"], label="Purpose of Loan", value="vehicle") # Default value
+                num_loan_rejections_6mo = gr.Slider(minimum=0, maximum=10, value=0, step=1, label="Loan Rejections in Last 6 Months") # Default value
 
     gr.Markdown("---")
-    submit_button = gr.Button("Fill All Fields to Evaluate", variant="primary", size="lg", interactive=False)
+    submit_button = gr.Button("Evaluate Loan Application", variant="primary", size="lg", interactive=True) # Default interactive=True
 
     with gr.Accordion("✅ **Decision & Analysis**", open=False) as output_accordion:
         decision_label = gr.Label(label="Final Decision", scale=1)
@@ -348,3 +346,4 @@ with gr.Blocks(theme=theme, title="AI Loan Officer") as demo:
 
 if __name__ == "__main__":
     demo.launch()
+
