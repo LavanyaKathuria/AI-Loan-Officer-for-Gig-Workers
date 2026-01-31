@@ -1,4 +1,3 @@
-Name- Lavanya Kathuria
 # 🤖 AI Loan Officer for Gig Workers
 
 An AI-powered web application that evaluates loan applications for gig workers based on their earning patterns, work stability, platform tenure, and financial behavior — just like a real loan officer would, but faster, more consistent, and without bias.
